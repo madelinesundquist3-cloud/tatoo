@@ -1,0 +1,15 @@
+{
+  "auth": {
+    "authorizedDomains": [
+      "localhost",
+      "tatoo-720d1.firebaseapp.com",
+      "tatoo-720d1.web.app"
+    ],
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Tattoo",
+        "supportEmail": "ccosmas001@gmail.com"
+      }
+    }
+  }
+}

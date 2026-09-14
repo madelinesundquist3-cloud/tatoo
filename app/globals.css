@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: #09090b;
+    --foreground: #fafafa;
+    --card: #121215;
+    --card-hover: #18181c;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --muted: #a1a1aa;
+    --accent: #ffffff;
+  }
+
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+/* Custom scrollbar for modern dark feel */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Editorial subtle glow and line accents */
+.editorial-border {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.editorial-border-hover:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.glass-nav {
+  background: rgba(9, 9, 11, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer components {
+  .studio-section { @apply mx-auto max-w-7xl px-5 py-16 sm:px-8 md:py-20; }
+  .studio-heading { @apply text-3xl font-medium leading-tight tracking-tight sm:text-4xl; }
+  .studio-eyebrow { @apply text-xs font-medium uppercase tracking-[0.18em] text-[#d3b995]; }
+  .studio-button { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#d3b995] px-6 py-3.5 text-sm font-semibold text-[#171612] transition-colors hover:bg-[#e3ccad]; }
+  .studio-button-secondary { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/20 px-6 py-3.5 text-sm font-medium text-white hover:bg-white/5; }
+  .studio-input { @apply mt-2 w-full rounded-xl border border-white/20 bg-[#151517] px-4 py-3 text-base text-white; }
+}
+
+:focus-visible { outline: 2px solid #d3b995; outline-offset: 4px; }
+section[id], main[id] { scroll-margin-top: 100px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
