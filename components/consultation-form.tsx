@@ -55,8 +55,8 @@ function UserCheckIcon({ className = "w-4 h-4" }: { className?: string }) {
 
 const DEFAULT_SERVICE_TOTALS: Record<ServiceId, number> = {
   tattoo: 280,
-  coverup: 450,
-  touchup: 150,
+  "cover-up": 450,
+  "touch-up": 150,
   removal: 220,
 };
 
