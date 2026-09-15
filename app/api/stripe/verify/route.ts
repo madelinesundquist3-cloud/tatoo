@@ -1,81 +1,72 @@
-// app/api/stripe/verify/route.ts
-//
-// Verifies payment completion for a Stripe Checkout Session upon client return.
+// Confirms a Checkout Session when the client returns from Stripe.
+// The webhook records the same outcome; whichever arrives first settles the booking.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getStripeInstance, stripeConfigured } from "@/lib/stripe";
-import { settleFromCheckoutSession } from "@/lib/stripe-settle";
+import { settleCheckoutSession } from "@/lib/stripe-settle";
+import { prisma } from "@/lib/prisma";
+import { bookingOffer } from "@/lib/offers";
 
-export async function GET(req: NextRequest) {
+export const runtime = "nodejs";
+
+const NO_STORE = { "Cache-Control": "private, no-store" };
+
+export async function GET(req: Request) {
   if (!stripeConfigured()) {
-    return NextResponse.json(
-      { error: "Stripe payments are not configured." },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: "Stripe payments are not configured." }, { status: 503 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const sessionId = searchParams.get("session_id");
-
-  if (!sessionId) {
-    return NextResponse.json(
-      { error: "session_id parameter is required." },
-      { status: 400 }
-    );
+  const sessionId = new URL(req.url).searchParams.get("session_id");
+  if (!sessionId || sessionId.length > 255) {
+    return NextResponse.json({ error: "session_id parameter is required." }, { status: 400 });
   }
 
   try {
-    const stripe = getStripeInstance();
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["payment_intent"],
-    });
+    const session = await getStripeInstance().checkout.sessions.retrieve(sessionId);
+    const settlement = await settleCheckoutSession(session);
+    const paid = settlement.status === "paid";
 
-    const settlement = await settleFromCheckoutSession(session);
+    const record =
+      paid && settlement.bookingRef
+        ? await prisma.booking.findUnique({
+            where: { ref: settlement.bookingRef },
+            select: {
+              ref: true,
+              clientName: true,
+              tattooTitle: true,
+              date: true,
+              time: true,
+              placement: true,
+              size: true,
+              depositPaid: true,
+              estimatedTotal: true,
+              status: true,
+              location: true,
+              notes: true,
+            },
+          })
+        : null;
+    // Notes hold the client's contact details; only the offer is sent back.
+    const booking = record ? { ...record, notes: undefined } : null;
 
-    let bookingData = null;
-    if (settlement.bookingRef && process.env.DATABASE_URL) {
-      try {
-        const { prisma } = await import("@/lib/prisma");
-        bookingData = await prisma.booking.findUnique({
-          where: { ref: settlement.bookingRef },
-          select: {
-            ref: true,
-            clientName: true,
-            clientEmail: true,
-            tattooTitle: true,
-            date: true,
-            time: true,
-            placement: true,
-            size: true,
-            style: true,
-            depositPaid: true,
-            estimatedTotal: true,
-            status: true,
-            notes: true,
-            createdAt: true,
-          },
-        });
-      } catch (dbErr) {
-        console.warn("Could not query booking details during verification:", dbErr);
-      }
-    }
-
-    return NextResponse.json({
-      paid: settlement.status === "completed",
-      status: settlement.status,
-      amount: settlement.amount,
-      currency: settlement.currency,
-      channel: settlement.channel,
-      bookingRef: settlement.bookingRef,
-      customerEmail: session.customer_details?.email || session.customer_email,
-      booking: bookingData,
-    });
-  } catch (error: unknown) {
-    const err = error as { message?: string };
-    console.error("Stripe verification failed:", err);
     return NextResponse.json(
-      { error: err?.message || "Failed to verify session with Stripe." },
-      { status: 500 }
+      {
+        paid,
+        status: settlement.status,
+        amount: settlement.amount,
+        currency: settlement.currency,
+        bookingRef: settlement.bookingRef,
+        customerEmail: paid ? session.customer_details?.email || session.customer_email || null : null,
+        booking,
+        offer: bookingOffer(record?.notes),
+      },
+      { headers: NO_STORE }
+    );
+  } catch (error) {
+    console.error("Stripe verification failed:", error);
+    return NextResponse.json(
+      { error: "We couldn't confirm your payment yet. If you were charged, your booking will appear in My bookings shortly." },
+      { status: 502, headers: NO_STORE }
     );
   }
 }

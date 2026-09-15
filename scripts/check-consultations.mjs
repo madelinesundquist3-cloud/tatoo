@@ -17,11 +17,16 @@ function load(file, dependencies = {}, globals = {}) {
 
 async function main() {
   const services = load('lib/services.ts');
-  assert.equal(services.pacificDate(new Date('2026-09-14T02:00:00Z')), '2026-09-13');
-  assert.equal(services.pacificDate(new Date('2026-01-01T07:00:00Z')), '2025-12-31');
-  assert.equal(services.validPreferredDate('2026-02-30', new Date('2026-01-01')), false);
-  assert.equal(services.validPreferredDate('2026-09-13', new Date('2026-09-13T18:00Z')), false);
-  assert.equal(services.validPreferredDate('2026-09-14', new Date('2026-09-13T18:00Z')), true);
+  const locations = load('lib/locations.ts');
+  const LA = 'America/Los_Angeles';
+  assert.equal(locations.dateInTimeZone(LA, new Date('2026-09-14T02:00:00Z')), '2026-09-13');
+  assert.equal(locations.dateInTimeZone(LA, new Date('2026-01-01T07:00:00Z')), '2025-12-31');
+  assert.equal(locations.dateInTimeZone('America/New_York', new Date('2026-09-14T02:00:00Z')), '2026-09-13');
+  assert.equal(locations.dateInTimeZone('America/New_York', new Date('2026-09-14T05:00:00Z')), '2026-09-14', 'New York reaches midnight before Los Angeles');
+  assert.equal(locations.validPreferredDate('2026-02-30', LA, new Date('2026-01-01')), false);
+  assert.equal(locations.validPreferredDate('2026-09-13', LA, new Date('2026-09-13T18:00Z')), false);
+  assert.equal(locations.validPreferredDate('2026-09-14', LA, new Date('2026-09-13T18:00Z')), true);
+  assert.equal(locations.validPreferredDate('2026-09-14', 'America/New_York', new Date('2026-09-14T05:00Z')), false, 'dates are checked in the studio time zone');
 
   const env = { DATABASE_URL: 'mock', FIREBASE_WEB_API_KEY: 'mock', ADMIN_EMAIL: 'owner@example.com' };
   let identity = { email: 'owner@example.com', emailVerified: true };
@@ -42,11 +47,13 @@ async function main() {
     findMany: async () => { reads++; return [...records.values()]; },
     findUnique: async ({ where }) => records.get(where.ref) || null,
   } };
-  const route = load('app/api/consultations/route.ts', { '@/lib/services': services, '@/lib/prisma': { prisma }, '@/lib/require-admin': admin }, { process: { env } });
-  const body = { requestId: 'c9e95e70-0959-4a52-a8d4-b269a572207b', service: 'removal', name: 'Test Client', email: 'client@example.com', phone: '', notes: 'Question about fading', date: '', time: "I'm flexible", consent: true };
+  const route = load('app/api/consultations/route.ts', { '@/lib/services': services, '@/lib/locations': locations, '@/lib/prisma': { prisma }, '@/lib/require-admin': admin }, { process: { env } });
+  const body = { requestId: 'c9e95e70-0959-4a52-a8d4-b269a572207b', location: 'austin', service: 'removal', name: 'Test Client', email: 'client@example.com', phone: '', notes: 'Question about fading', date: '', time: "I'm flexible", consent: true };
   const request = (data = body, origin = 'http://localhost:3100') => new Request('http://localhost:3100/api/consultations', { method: 'POST', headers: { origin }, body: JSON.stringify(data) });
   assert.equal((await route.POST(request(null))).status, 400);
   assert.equal((await route.POST(request({ ...body, service: 'unknown' }))).status, 400);
+  assert.equal((await route.POST(request({ ...body, location: 'atlantis' }))).status, 400);
+  assert.equal((await route.POST(request({ ...body, location: undefined }))).status, 400);
   assert.equal((await route.POST(request({ ...body, consent: false }))).status, 400);
   assert.equal((await route.POST(request({ ...body, name: '  ' }))).status, 400);
   assert.equal((await route.POST(request({ ...body, email: 'invalid' }))).status, 400);
@@ -68,6 +75,8 @@ async function main() {
   assert.equal(stored.depositPaid, 0);
   assert.equal(stored.status, 'pending');
   assert.equal(stored.tattooTitle, 'Tattoo removal');
+  assert.equal(stored.location, 'austin');
+  assert.ok(stored.time.endsWith('Central Time'), stored.time);
   assert.equal(JSON.parse(stored.notes).consent, true);
 
   const anonymous = new Request('http://localhost:3100/api/consultations');
@@ -104,8 +113,8 @@ async function main() {
     }),
   };
   const mockSettle = {
-    settleFromCheckoutSession: async (session) => ({
-      status: session.payment_status === 'paid' ? 'completed' : 'pending',
+    settleCheckoutSession: async (session) => ({
+      status: session.payment_status === 'paid' ? 'paid' : 'unpaid',
       amount: 50,
       currency: 'usd',
       channel: 'card',
@@ -119,6 +128,7 @@ async function main() {
       '@/lib/stripe': mockStripe,
       '@/lib/stripe-settle': mockSettle,
       '@/lib/prisma': { prisma },
+      '@/lib/offers': load('lib/offers.ts', { '@/lib/services': services }),
     },
     { process: { env } }
   );
@@ -128,6 +138,6 @@ async function main() {
   assert.equal((await (await verify.GET(checkoutRequest)).json()).paid, false);
   payment = { payment_status: 'paid', status: 'complete' };
   assert.equal((await (await verify.GET(checkoutRequest)).json()).paid, true);
-  console.log('Passed: Pacific dates, request validation, failed saves, retry deduplication, zero-payment requests, admin authorization, and payment verification.');
+  console.log('Passed: studio time-zone dates, locations, request validation, failed saves, retry deduplication, zero-payment requests, admin authorization, and payment verification.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -6,8 +6,9 @@ import { signInWithPopup, signOut } from "firebase/auth";
 import { getClientAuth } from "@/lib/firebase";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { bookingLocation, locationName } from "@/lib/locations";
 
-type Consultation = { ref: string; clientName: string; clientEmail: string; tattooTitle: string; date: string; time: string; notes: string | null; status: string; createdAt: string };
+type Consultation = { ref: string; clientName: string; clientEmail: string; tattooTitle: string; location: string | null; date: string; time: string; notes: string | null; status: string; createdAt: string };
 
 function requestDetails(notes: string | null): { phone?: string; message?: string } {
   try { return JSON.parse(notes || "{}"); } catch { return {}; }
@@ -41,7 +42,7 @@ export default function ConsultationInbox() {
     <div className="my-7 flex flex-wrap gap-3"><button disabled={busy} onClick={() => load(true)} className="studio-button disabled:opacity-50">{busy ? "Loading…" : "Sign in with Google"}</button><button disabled={busy} onClick={() => load(false)} className="studio-button-secondary disabled:opacity-50">Refresh requests</button>{bookings !== null && <button disabled={busy} onClick={logout} className="studio-button-secondary">Sign out</button>}</div>
     {error && <p role="alert" className="mb-6 rounded-xl border border-red-400/30 p-4 text-red-200">{error}</p>}
     {bookings?.length === 0 && <p className="rounded-2xl border border-white/10 p-8 text-zinc-400">No consultation requests yet.</p>}
-    <div className="grid gap-5 md:grid-cols-2">{bookings?.map((booking) => { const details = requestDetails(booking.notes); return <article key={booking.ref} className="min-w-0 rounded-2xl border border-white/10 p-6"><p className="text-xs uppercase tracking-wider text-[#d3b995]">{booking.status}</p><h2 className="mt-3 text-xl">{booking.tattooTitle}</h2><p className="mt-4 font-medium">{booking.clientName}</p><p className="break-all text-sm text-zinc-300">{booking.clientEmail}</p>{details.phone && <p className="text-sm text-zinc-300">{details.phone}</p>}<p className="mt-4 text-sm text-zinc-400">{booking.date} · {booking.time}</p>{details.message && <p className="mt-4 whitespace-pre-wrap break-words text-sm text-zinc-300">{details.message}</p>}<p className="mt-5 break-all border-t border-white/10 pt-4 font-mono text-xs text-zinc-500">{booking.ref}</p></article>; })}</div>
+    <div className="grid gap-5 md:grid-cols-2">{bookings?.map((booking) => { const details = requestDetails(booking.notes); return <article key={booking.ref} className="min-w-0 rounded-2xl border border-white/10 p-6"><p className="text-xs uppercase tracking-wider text-[#d3b995]">{booking.status}</p><h2 className="mt-3 text-xl">{booking.tattooTitle}</h2><p className="mt-4 font-medium">{booking.clientName}</p><p className="break-all text-sm text-zinc-300">{booking.clientEmail}</p>{details.phone && <p className="text-sm text-zinc-300">{details.phone}</p>}<p className="mt-4 text-sm text-[#d3b995]">Marked Studio {locationName(bookingLocation(booking.location))}</p><p className="mt-1 text-sm text-zinc-400">{booking.date} · {booking.time}</p>{details.message && <p className="mt-4 whitespace-pre-wrap break-words text-sm text-zinc-300">{details.message}</p>}<p className="mt-5 break-all border-t border-white/10 pt-4 font-mono text-xs text-zinc-500">{booking.ref}</p></article>; })}</div>
     <Link href="/admin" className="mt-8 inline-block text-sm text-zinc-400 underline">Back to booking manager</Link>
   </main><Footer /></>;
 }

@@ -36,6 +36,7 @@ model Booking {
   date           String
   time           String
   sessionType    String   @default("Studio Appointment")
+  location       String?
   depositPaid    Float    @default(50)
   estimatedTotal Float    @default(280)
   status         String   @default("deposit_held")

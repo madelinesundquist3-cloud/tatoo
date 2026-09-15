@@ -1,5 +1,7 @@
 "use client";
 
+import { formatUsd, getSizeTier, suggestedSizeForPlacement } from "@/lib/services";
+
 import React, { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -39,7 +41,6 @@ export function TattooDetailView({
   const [isFollowing, setIsFollowing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [ideaRequested, setIdeaRequested] = useState(false);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
 
   const handleLike = () => {
@@ -193,20 +194,20 @@ export function TattooDetailView({
           {/* Pricing & Deposit Indicator Card */}
           <div className="p-4 rounded-2xl bg-zinc-900/60 border border-white/[0.08] space-y-2.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Estimated Full Service Price</span>
+              <span className="text-zinc-400">Estimated starting price</span>
               <span className="font-mono font-bold text-white">
-                {tattoo.placement.toLowerCase().includes("back") || tattoo.placement.toLowerCase().includes("sleeve")
-                  ? "$600 – $1,200 USD"
-                  : "$280 – $450 USD"}
+                From {formatUsd(getSizeTier(suggestedSizeForPlacement(tattoo.placement))!.estimate)}
               </span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Required Deposit Today</span>
-              <span className="font-mono font-bold text-[#d3b995]">$50.00 USD (or $0.50 test hold)</span>
+              <span className="text-zinc-400">Deposit to book</span>
+              <span className="font-mono font-bold text-[#d3b995]">
+                {formatUsd(getSizeTier(suggestedSizeForPlacement(tattoo.placement))!.deposit)}
+              </span>
             </div>
             <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-white/[0.06] text-zinc-400">
-              <span>Studio Balance Due at Session</span>
-              <span className="font-mono text-emerald-400">Full Price minus Deposit</span>
+              <span>Credited toward your final price</span>
+              <span className="font-mono text-emerald-400">Final quote by your artist</span>
             </div>
           </div>
 

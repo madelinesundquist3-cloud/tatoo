@@ -39,7 +39,7 @@ export function TattooCard({
     setIsSaved(!isSaved);
   };
 
-  const handleCardClick = (e: React.MouseEvent) => {
+  const handleCardClick = () => {
     if (onSelect) {
       // If modal onSelect handler is provided, we can trigger it
       onSelect(tattoo);

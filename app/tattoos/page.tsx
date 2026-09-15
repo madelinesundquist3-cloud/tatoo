@@ -18,7 +18,7 @@ export default function ExploreTattoosPage() {
   });
 
   const filteredTattoos = useMemo(() => {
-    let list = SAMPLE_TATTOOS.filter((tattoo) => {
+    const list = SAMPLE_TATTOOS.filter((tattoo) => {
       // Category match
       if (
         filters.selectedCategory &&

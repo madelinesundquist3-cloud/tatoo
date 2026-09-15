@@ -17,9 +17,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Marked Studio — Tattoos & Removal Consultations",
+  title: "Marked Studio — Tattoo Studios Across the USA",
   description:
-    "Explore tattoos, tattoo removal, cover-ups, and touch-ups. Request a consultation with Los Angeles as our initial service area.",
+    "Book tattoos, cover-ups, touch-ups, and removal consultations at Marked Studio locations across the USA, with secure online deposits.",
   keywords: [
     "tattoos",
     "marked studio",
@@ -28,12 +28,12 @@ export const metadata: Metadata = {
     "fine line tattoo",
     "realism tattoo",
     "tattoo removal consultation",
-    "Los Angeles",
+    "tattoo studios USA",
     "tattoo flash",
   ],
   authors: [{ name: "Marked Studio" }],
   openGraph: {
-    title: "Marked Studio — Tattoos & Removal Consultations",
+    title: "Marked Studio — Tattoo Studios Across the USA",
     description:
       "New ink or a fresh start. Explore tattoo and removal services, then request a consultation in a few simple steps.",
     type: "website",

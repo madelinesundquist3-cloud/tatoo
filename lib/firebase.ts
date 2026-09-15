@@ -1,13 +1,5 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  Auth,
-  User as FirebaseUser,
-} from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -25,24 +17,7 @@ export const isFirebaseConfigured = Boolean(
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
-let db: Firestore | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
-
-export function getClientDb(): Firestore | null {
-  if (typeof window !== "undefined" && isFirebaseConfigured) {
-    if (!app) {
-      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    }
-    if (!db && app) {
-      try {
-        db = getFirestore(app);
-      } catch (e) {
-        console.warn("Firestore not yet initialized in console:", e);
-      }
-    }
-  }
-  return db;
-}
 
 export function getClientAuth(): {
   app: FirebaseApp | null;
@@ -67,64 +42,28 @@ export function getClientAuth(): {
 // Pre-initialize on browser load if possible
 if (typeof window !== "undefined") {
   getClientAuth();
-  getClientDb();
 }
 
-export { app, auth, db, googleProvider };
+export { app, auth, googleProvider };
 
-export interface NormalizedGoogleUser {
-  id: string;
-  name: string;
-  username: string;
-  email: string;
-  avatarUrl: string;
-}
-
-/**
- * Sign in with Google using Firebase Authentication.
- * If Firebase keys are configured, opens the official Google popup.
- * If keys are pending in .env.local, provides a simulated Google test account.
- */
-export async function loginWithFirebaseGoogle(): Promise<NormalizedGoogleUser> {
-  const { auth: clientAuth, googleProvider: clientProvider } = getClientAuth();
-
-  if (isFirebaseConfigured && clientAuth && clientProvider) {
-    try {
-      const result = await signInWithPopup(clientAuth, clientProvider);
-      const fbUser: FirebaseUser = result.user;
-
-      const email = fbUser.email || "collector@gmail.com";
-      const cleanUsername =
-        fbUser.displayName
-          ? fbUser.displayName.toLowerCase().replace(/[^a-z0-9_]/g, "")
-          : email.split("@")[0];
-
-      return {
-        id: fbUser.uid,
-        name: fbUser.displayName || "Google User",
-        username: cleanUsername || `user_${fbUser.uid.slice(0, 6)}`,
-        email: email,
-        avatarUrl:
-          fbUser.photoURL ||
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-      };
-    } catch (error: unknown) {
-      console.error("Firebase Google Auth Error:", error);
-      throw error;
-    }
-  } else {
-    // Fallback demo simulation when Firebase environment keys are not yet pasted
-    console.warn(
-      "Firebase environment keys not detected in .env.local. Running demo Google sign-in simulation."
-    );
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    return {
-      id: "google-demo-" + Date.now(),
-      name: "Alex Rivera",
-      username: "alex_rivera",
-      email: "alex.rivera@gmail.com",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
-    };
+/** Opens the Google sign-in popup. The signed-in user arrives through onAuthStateChanged. */
+export async function signInWithGoogle(): Promise<void> {
+  const { auth: clientAuth, googleProvider: provider } = getClientAuth();
+  if (!clientAuth || !provider) {
+    throw new Error("Google sign-in is not available on this site yet.");
   }
+  await signInWithPopup(clientAuth, provider);
+}
+
+/** ID token for the signed-in Firebase user, or null. API routes verify it server-side. */
+export async function getIdToken(): Promise<string | null> {
+  const { auth: clientAuth } = getClientAuth();
+  if (!clientAuth) return null;
+  await clientAuth.authStateReady();
+  return (await clientAuth.currentUser?.getIdToken()) ?? null;
+}
+
+export async function signOutFirebase(): Promise<void> {
+  const { auth: clientAuth } = getClientAuth();
+  if (clientAuth) await signOut(clientAuth);
 }

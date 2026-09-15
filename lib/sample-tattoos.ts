@@ -41,6 +41,13 @@ export const CATEGORIES = [
 
 export type Category = (typeof CATEGORIES)[number];
 
+/** Credit for the studio's own client work. */
+const STUDIO_AUTHOR: Tattoo["author"] = {
+  name: "Marked Studio",
+  username: "markedstudio",
+  avatarUrl: "/marked-studio-emblem.png",
+};
+
 export const SAMPLE_TATTOOS: Tattoo[] = [
   {
     id: "tat-top-spine",
@@ -156,14 +163,10 @@ export const SAMPLE_TATTOOS: Tattoo[] = [
     imageUrl: "/clients/client-sword-celine.jpg",
     style: "Black & Grey",
     placement: "Forearm",
-    author: {
-      name: "Celine K.",
-      username: "celine_k",
-      avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-    },
+    author: STUDIO_AUTHOR,
     likesCount: 2980,
     savesCount: 1450,
-    tags: ["sword", "dagger", "script", "celine", "black and grey", "forearm", "dark art", "verified client"],
+    tags: ["sword", "dagger", "script", "black and grey", "forearm", "dark art", "studio work"],
     aspectRatio: "tall",
     description: "Dark fantasy dagger hilt enveloped by dark mystical smoke with custom calligraphy lettering on the forearm.",
     featured: true,
@@ -174,14 +177,10 @@ export const SAMPLE_TATTOOS: Tattoo[] = [
     imageUrl: "/clients/client-lover-boy-rose.jpg",
     style: "Traditional",
     placement: "Arm",
-    author: {
-      name: "Jordan M.",
-      username: "jordan_m",
-      avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
-    },
+    author: STUDIO_AUTHOR,
     likesCount: 3120,
     savesCount: 1620,
-    tags: ["lover boy", "rose", "traditional", "color", "heart", "banner", "vintage", "verified client"],
+    tags: ["lover boy", "rose", "traditional", "color", "heart", "banner", "vintage", "studio work"],
     aspectRatio: "tall",
     description: "Classic American Traditional rose with vibrant golden amber petals, crimson heart, and Lover Boy banner.",
     featured: true,
@@ -192,14 +191,10 @@ export const SAMPLE_TATTOOS: Tattoo[] = [
     imageUrl: "/clients/client-whale-chest.jpg",
     style: "Realism",
     placement: "Chest",
-    author: {
-      name: "Marcus V.",
-      username: "marcus_v",
-      avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
-    },
+    author: STUDIO_AUTHOR,
     likesCount: 4230,
     savesCount: 2480,
-    tags: ["whale", "coverup", "chest", "ink splash", "marine", "realism", "transformation", "verified client"],
+    tags: ["whale", "coverup", "chest", "ink splash", "marine", "realism", "transformation", "studio work"],
     aspectRatio: "tall",
     description: "Dynamic marine composition seamlessly transforming a dark legacy tattoo into an ink-splash humpback whale.",
     featured: true,
@@ -210,14 +205,10 @@ export const SAMPLE_TATTOOS: Tattoo[] = [
     imageUrl: "/clients/client-botanical-fine-line.jpg",
     style: "Fine Line",
     placement: "Forearm",
-    author: {
-      name: "Elena R.",
-      username: "elena_r",
-      avatarUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80",
-    },
+    author: STUDIO_AUTHOR,
     likesCount: 3890,
     savesCount: 2110,
-    tags: ["fine line", "floral", "botanical", "single needle", "flowers", "wrist", "verified client"],
+    tags: ["fine line", "floral", "botanical", "single needle", "flowers", "wrist", "studio work"],
     aspectRatio: "tall",
     description: "Micro fine line blooming blossoms and leaf vine gracefully wrapping down the inner forearm and wrist.",
     featured: true,
@@ -227,17 +218,13 @@ export const SAMPLE_TATTOOS: Tattoo[] = [
     title: "Texas Turquoise & Wildflower Memorial Cover-Up",
     imageUrl: "/clients/client-turquoise-coverup.jpg",
     style: "Color",
-    placement: "Full Sleeve",
-    author: {
-      name: "Kaylie & Donna S.",
-      username: "kaylie_donna",
-      avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
-    },
+    placement: "Upper Arm / Shoulder",
+    author: STUDIO_AUTHOR,
     likesCount: 3670,
     savesCount: 1840,
-    tags: ["turquoise", "texas", "coverup", "flowers", "memorial", "transformation", "verified client"],
+    tags: ["turquoise", "texas", "coverup", "flowers", "memorial", "transformation", "studio work"],
     aspectRatio: "tall",
-    description: "Complete sleeve transformation turning a 17-year-old faded script into a glowing turquoise gemstone and Western floral filigree.",
+    description: "Cover-up turning a faded 2007 script tattoo into a turquoise gemstone framed by Western floral filigree, with the name and year kept in new tags.",
     featured: true,
   },
   {
@@ -446,37 +433,6 @@ export const SAMPLE_TATTOOS: Tattoo[] = [
     tags: ["blackwork", "ornamental", "sleeve", "geometry"],
     aspectRatio: "tall",
     description: "Full body ornamental flow harmonizing anatomical musculature with sacred geometry.",
-  },
-];
-
-export const HERO_HIGHLIGHT_TATTOOS = [
-  {
-    id: "hero-1",
-    imageUrl: "/clients/client-botanical-fine-line.jpg",
-    title: "Botanical Fine Line",
-    artist: "Elena R. • Verified",
-    style: "Fine Line",
-  },
-  {
-    id: "hero-2",
-    imageUrl: "/clients/client-whale-chest.jpg",
-    title: "Ocean Whale Cover-Up",
-    artist: "Marcus V. • Verified",
-    style: "Realism",
-  },
-  {
-    id: "hero-3",
-    imageUrl: "/clients/client-lover-boy-rose.jpg",
-    title: "Lover Boy Traditional",
-    artist: "Jordan M. • Verified",
-    style: "Traditional",
-  },
-  {
-    id: "hero-4",
-    imageUrl: "/clients/client-sword-celine.jpg",
-    title: "Dark Fantasy Dagger",
-    artist: "Celine K. • Verified",
-    style: "Black & Grey",
   },
 ];
 

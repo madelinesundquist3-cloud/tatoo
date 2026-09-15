@@ -2,8 +2,9 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { Tattoo } from "@/lib/sample-tattoos";
+import { suggestedSizeForPlacement } from "@/lib/services";
 
-// All design entry points use the same accessible, full-page consultation flow.
+// All design entry points use the same accessible, full-page booking flow.
 export function BookingModal({ isOpen, onClose, initialTattoo }: { isOpen: boolean; onClose: () => void; initialTattoo?: Tattoo | null }) {
   const router = useRouter();
   useEffect(() => {
@@ -11,12 +12,8 @@ export function BookingModal({ isOpen, onClose, initialTattoo }: { isOpen: boole
     const query = new URLSearchParams({ service: "tattoo" });
     if (initialTattoo) {
       query.set("design", initialTattoo.id);
-      // Estimate full amount based on piece scale
-      const estimatedPrice = initialTattoo.placement.toLowerCase().includes("back") || initialTattoo.placement.toLowerCase().includes("sleeve")
-        ? "600"
-        : "280";
-      query.set("price", estimatedPrice);
-      query.set("deposit", "50");
+      // Pre-select a size from the piece's placement; the server prices the deposit.
+      query.set("size", suggestedSizeForPlacement(initialTattoo.placement));
     }
     router.push("/book?" + query.toString());
     onClose();

@@ -1,16 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { loginWithFirebaseGoogle, isFirebaseConfigured, getClientDb } from "@/lib/firebase";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
 import {
-  collection,
-  addDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
+  getClientAuth,
+  getIdToken,
+  isFirebaseConfigured,
+  signInWithGoogle,
+  signOutFirebase,
+} from "@/lib/firebase";
+import type { BookingStatus } from "@/lib/services";
 
 export interface AdminBooking {
   id: string;
@@ -24,23 +23,14 @@ export interface AdminBooking {
   style: string;
   placement: string;
   size: string;
+  location?: string | null;
   date: string;
   time: string;
-  sessionType: "Studio Appointment" | "Design Consultation";
+  sessionType: string;
   depositPaid: number;
   estimatedTotal: number;
-  status: "deposit_held" | "confirmed" | "completed" | "cancelled";
+  status: BookingStatus;
   notes?: string;
-  createdAt: string;
-}
-
-export interface UserBooking {
-  ref: string;
-  pieceTitle: string;
-  date: string;
-  time: string;
-  placement: string;
-  deposit: number;
   createdAt: string;
 }
 
@@ -50,363 +40,174 @@ export interface UserProfile {
   username: string;
   email: string;
   avatarUrl: string;
-  favoriteStyle?: string;
-  bookings: UserBooking[];
+  emailVerified: boolean;
 }
 
 interface AuthContextType {
   user: UserProfile | null;
-  login: (email: string, username?: string) => void;
-  loginWithGoogle: () => Promise<UserProfile>;
-  register: (
-    name: string,
-    username: string,
-    email: string,
-    favoriteStyle?: string
-  ) => UserProfile;
-  logout: () => void;
-  addBooking: (booking: Omit<UserBooking, "createdAt">) => void;
+  /** False until Firebase has restored (or ruled out) a saved session. */
+  authReady: boolean;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
   allBookings: AdminBooking[];
-  recordAdminBooking: (
-    booking: Omit<AdminBooking, "id" | "createdAt" | "status"> & {
-      status?: AdminBooking["status"];
-    }
-  ) => AdminBooking;
-  updateBookingStatus: (
-    id: string,
-    status: AdminBooking["status"]
-  ) => void;
+  /** Why the admin booking list couldn't be loaded or changed, or "" when it's in sync. */
+  bookingsError: string;
+  updateBookingStatus: (id: string, status: BookingStatus) => Promise<void>;
   refreshBookings: () => Promise<void>;
   isAuthModalOpen: boolean;
-  authModalMode: "login" | "register";
-  openAuthModal: (mode?: "login" | "register") => void;
+  openAuthModal: () => void;
   closeAuthModal: () => void;
   isFirebaseConfigured: boolean;
   isAdmin: boolean;
   adminEmail: string;
 }
 
-export const ADMIN_EMAIL = (
-  process.env.NEXT_PUBLIC_ADMIN_EMAIL || "ccosmas001@gmail.com"
-).toLowerCase().trim();
+// A display hint only: every admin API call is verified server-side from the Firebase ID token.
+export const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").toLowerCase().trim();
+
+// Earlier versions kept an unverified profile and every client's bookings in localStorage.
+const LEGACY_STORAGE_KEYS = ["tattoo_current_user", "tattoo_all_bookings"];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = "tattoo_current_user";
-const GLOBAL_BOOKINGS_KEY = "tattoo_all_bookings";
+function toProfile(fbUser: FirebaseUser): UserProfile {
+  const email = fbUser.email ?? "";
+  const username =
+    (fbUser.displayName ?? email.split("@")[0]).toLowerCase().replace(/[^a-z0-9_]/g, "") ||
+    `user_${fbUser.uid.slice(0, 6)}`;
+  return {
+    id: fbUser.uid,
+    name: fbUser.displayName || email,
+    username,
+    email,
+    avatarUrl: fbUser.photoURL ?? "",
+    emailVerified: fbUser.emailVerified,
+  };
+}
+
+async function authorizedFetch(input: string, init: RequestInit = {}) {
+  const token = await getIdToken();
+  if (!token) throw new Error("Please sign in again.");
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(input, { ...init, headers, cache: "no-store" });
+}
+
+async function fetchBookings(): Promise<AdminBooking[]> {
+  const response = await authorizedFetch("/api/bookings");
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !Array.isArray(data?.bookings)) {
+    throw new Error(data?.error || "Bookings could not be loaded.");
+  }
+  return data.bookings;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [authReady, setAuthReady] = useState(!isFirebaseConfigured);
   const [allBookings, setAllBookings] = useState<AdminBooking[]>([]);
+  const [bookingsError, setBookingsError] = useState("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<"login" | "register">("register");
 
-  const fetchBookingsFromServer = async () => {
-    try {
-      const res = await fetch("/api/bookings");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data?.success && Array.isArray(data.bookings)) {
-        setAllBookings((prev) => {
-          const map = new Map<string, AdminBooking>();
-          [...data.bookings, ...prev].forEach((b: AdminBooking) => {
-            if (b && b.ref && !map.has(b.ref)) {
-              map.set(b.ref, b);
-            }
-          });
-          const merged = Array.from(map.values());
-          try {
-            localStorage.setItem(GLOBAL_BOOKINGS_KEY, JSON.stringify(merged));
-          } catch (e) {}
-          return merged;
-        });
-      }
-    } catch (e) {
-      console.warn("Could not fetch bookings from server API", e);
-    }
-  };
-
-  // Load user and clean dynamic bookings from localStorage and Firestore on mount
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem(STORAGE_KEY);
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (e) {
-      console.error("Failed to load user session", e);
+      LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    } catch {
+      // Storage can be unavailable (private mode); nothing to clean up then.
     }
 
-    try {
-      const storedBookings = localStorage.getItem(GLOBAL_BOOKINGS_KEY);
-      if (storedBookings) {
-        const parsed: AdminBooking[] = JSON.parse(storedBookings);
-        // Strip out any previous dummy/mock seed records
-        const realOnly = parsed.filter(
-          (b) => !b.id.startsWith("book-") && b.ref !== "TAT-90214"
-        );
-        setAllBookings(realOnly);
-        localStorage.setItem(GLOBAL_BOOKINGS_KEY, JSON.stringify(realOnly));
-      } else {
-        setAllBookings([]);
-      }
-    } catch (e) {
-      console.error("Failed to load studio bookings", e);
-    }
-
-    // Connect real-time Cloud Firestore synchronization if database exists
-    const firestoreDb = getClientDb();
-    if (firestoreDb) {
-      try {
-        const q = query(
-          collection(firestoreDb, "bookings"),
-          orderBy("createdAt", "desc")
-        );
-        const unsubscribe = onSnapshot(
-          q,
-          (snapshot) => {
-            if (!snapshot.empty) {
-              const liveData: AdminBooking[] = snapshot.docs.map((docSnap) => {
-                const data = docSnap.data();
-                return {
-                  id: docSnap.id,
-                  ref: data.ref || `TAT-${docSnap.id.slice(0, 5)}`,
-                  clientName: data.clientName || "Client",
-                  clientEmail: data.clientEmail || "",
-                  clientAvatar: data.clientAvatar || "",
-                  clientUsername: data.clientUsername || "",
-                  tattooTitle: data.tattooTitle || "Custom Design",
-                  tattooImage:
-                    data.tattooImage ||
-                    "https://images.unsplash.com/photo-1598371839696-5c5bb00bdc28?auto=format&fit=crop&w=400&q=80",
-                  style: data.style || "Custom",
-                  placement: data.placement || "Forearm",
-                  size: data.size || "Medium",
-                  date: data.date || "Pending",
-                  time: data.time || "12:00 PM",
-                  sessionType: data.sessionType || "Studio Appointment",
-                  depositPaid: data.depositPaid ?? 50,
-                  estimatedTotal: data.estimatedTotal ?? 280,
-                  status: data.status || "deposit_held",
-                  notes: data.notes || "",
-                  createdAt: data.createdAt || new Date().toISOString(),
-                };
-              });
-              setAllBookings(liveData);
-              localStorage.setItem(
-                GLOBAL_BOOKINGS_KEY,
-                JSON.stringify(liveData)
-              );
-            }
-          },
-          (err) => {
-            console.info("Firestore live sync active via local ledger:", err.message);
-          }
-        );
-        return () => unsubscribe();
-      } catch (err) {
-        console.warn("Firestore snapshot listener error:", err);
-      }
-    }
-
-    // Always fetch latest bookings from centralized server API
-    fetchBookingsFromServer();
+    const { auth } = getClientAuth();
+    if (!auth) return;
+    return onAuthStateChanged(auth, (fbUser) => {
+      setUser(fbUser ? toProfile(fbUser) : null);
+      if (!fbUser) setAllBookings([]);
+      setAuthReady(true);
+    });
   }, []);
 
-  const saveUser = (u: UserProfile | null) => {
-    setUser(u);
-    try {
-      if (u) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch (e) {
-      console.error("Failed to save user session", e);
-    }
-  };
-
-  const login = (email: string, username?: string) => {
-    const cleanUsername =
-      username ||
-      email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "");
-    const newUser: UserProfile = {
-      id: "usr-" + Date.now(),
-      name: username ? username : "Tattoo Collector",
-      username: cleanUsername,
-      email,
-      avatarUrl:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
-      bookings: [],
-    };
-    saveUser(newUser);
-    setIsAuthModalOpen(false);
-  };
-
-  const register = (
-    name: string,
-    username: string,
-    email: string,
-    favoriteStyle?: string
-  ): UserProfile => {
-    const cleanUsername = username
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9_]/g, "");
-    const newUser: UserProfile = {
-      id: "usr-" + Date.now(),
-      name,
-      username: cleanUsername || "collector",
-      email,
-      favoriteStyle: favoriteStyle || "All Styles",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
-      bookings: [],
-    };
-    saveUser(newUser);
-    setIsAuthModalOpen(false);
-    return newUser;
-  };
-
-  const loginWithGoogle = async (): Promise<UserProfile> => {
-    const googleUser = await loginWithFirebaseGoogle();
-    const existingBookings = user?.bookings || [];
-    const profile: UserProfile = {
-      id: googleUser.id,
-      name: googleUser.name,
-      username: googleUser.username,
-      email: googleUser.email,
-      avatarUrl: googleUser.avatarUrl,
-      bookings: existingBookings,
-    };
-    saveUser(profile);
-    setIsAuthModalOpen(false);
-    return profile;
-  };
-
-  const logout = () => {
-    saveUser(null);
-  };
-
-  const addBooking = (booking: Omit<UserBooking, "createdAt">) => {
-    setUser((prev) => {
-      if (!prev) return null;
-      const updated: UserProfile = {
-        ...prev,
-        bookings: [
-          { ...booking, createdAt: new Date().toISOString() },
-          ...prev.bookings,
-        ],
-      };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
-      return updated;
-    });
-  };
-
-  const recordAdminBooking = (
-    booking: Omit<AdminBooking, "id" | "createdAt" | "status"> & {
-      status?: AdminBooking["status"];
-    }
-  ) => {
-    const newEntry: AdminBooking = {
-      ...booking,
-      id: "admin-bk-" + Date.now(),
-      status: booking.status || "deposit_held",
-      createdAt: new Date().toISOString(),
-    };
-    setAllBookings((prev) => {
-      const updated = [newEntry, ...prev.filter((b) => b.ref !== newEntry.ref)];
-      try {
-        localStorage.setItem(GLOBAL_BOOKINGS_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
-      return updated;
-    });
-
-    // Write to central server API so all devices see the booking
-    fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newEntry),
-    }).catch((err) => {
-      console.warn("Server booking record fallback:", err);
-    });
-
-    // Write to Firestore in background
-    const firestoreDb = getClientDb();
-    if (firestoreDb) {
-      addDoc(collection(firestoreDb, "bookings"), {
-        ...newEntry,
-        timestamp: new Date(),
-      }).catch((err) => {
-        console.info("Firestore remote record fallback:", err.message);
-      });
-    }
-
-    return newEntry;
-  };
-
-  const updateBookingStatus = (id: string, status: AdminBooking["status"]) => {
-    setAllBookings((prev) => {
-      const updated = prev.map((b) => (b.id === id ? { ...b, status } : b));
-      try {
-        localStorage.setItem(GLOBAL_BOOKINGS_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
-      return updated;
-    });
-
-    // Update on server API
-    fetch("/api/bookings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status }),
-    }).catch((err) => {
-      console.warn("Server status update fallback:", err);
-    });
-
-    const firestoreDb = getClientDb();
-    if (firestoreDb && !id.startsWith("admin-bk-")) {
-      updateDoc(doc(firestoreDb, "bookings", id), { status }).catch((err) => {
-        console.info("Firestore status update fallback:", err.message);
-      });
-    }
-  };
-
-  const openAuthModal = (mode: "login" | "register" = "register") => {
-    setAuthModalMode(mode);
-    setIsAuthModalOpen(true);
-  };
-
-  const closeAuthModal = () => {
-    setIsAuthModalOpen(false);
-  };
-
   const isAdmin = Boolean(
-    user?.email && user.email.toLowerCase().trim() === ADMIN_EMAIL
+    ADMIN_EMAIL && user?.emailVerified && user.email.toLowerCase() === ADMIN_EMAIL
   );
+
+  const refreshBookings = useCallback(async () => {
+    try {
+      setAllBookings(await fetchBookings());
+      setBookingsError("");
+    } catch (error) {
+      setBookingsError(error instanceof Error ? error.message : "Bookings could not be loaded.");
+      throw error;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    fetchBookings()
+      .then((bookings) => {
+        if (cancelled) return;
+        setAllBookings(bookings);
+        setBookingsError("");
+      })
+      .catch((error) => {
+        console.warn("Could not load bookings:", error);
+        if (!cancelled) setBookingsError(error instanceof Error ? error.message : "Bookings could not be loaded.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
+  const updateBookingStatus = useCallback(
+    async (id: string, status: BookingStatus) => {
+      setAllBookings((current) =>
+        current.map((b) => (b.id === id || b.ref === id ? { ...b, status } : b))
+      );
+      try {
+        const response = await authorizedFetch("/api/bookings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status }),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.error || "The status change couldn’t be saved.");
+        }
+      } catch (error) {
+        console.error("Could not update booking status:", error);
+        // Put the list back in line with the server, then explain what failed.
+        await refreshBookings().catch(() => undefined);
+        setBookingsError(error instanceof Error ? error.message : "The status change couldn’t be saved.");
+      }
+    },
+    [refreshBookings]
+  );
+
+  const loginWithGoogle = useCallback(async () => {
+    await signInWithGoogle();
+    setIsAuthModalOpen(false);
+  }, []);
+
+  const logout = useCallback(async () => {
+    setAllBookings([]);
+    setBookingsError("");
+    await signOutFirebase();
+  }, []);
+
+  const openAuthModal = useCallback(() => setIsAuthModalOpen(true), []);
+  const closeAuthModal = useCallback(() => setIsAuthModalOpen(false), []);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        login,
+        authReady,
         loginWithGoogle,
-        register,
         logout,
-        addBooking,
         allBookings,
-        recordAdminBooking,
+        bookingsError,
         updateBookingStatus,
-        refreshBookings: fetchBookingsFromServer,
+        refreshBookings,
         isAuthModalOpen,
-        authModalMode,
         openAuthModal,
         closeAuthModal,
         isFirebaseConfigured,

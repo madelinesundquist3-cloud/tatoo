@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { Tattoo } from "@/lib/sample-tattoos";
 import { TattooCard } from "@/components/tattoo-card";
-import { X, Heart, Bookmark, MapPin, Share2, Sparkles } from "lucide-react";
+import { X, MapPin, Share2, Sparkles } from "lucide-react";
 
 interface TattooGridProps {
   tattoos: Tattoo[];

@@ -1,121 +1,118 @@
- import type Stripe from "stripe";
+import type Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
+import { fromMinorUnits, toMinorUnits } from "@/lib/stripe-amounts";
+import { CHECKOUT_STATUSES, isCheckoutStatus } from "@/lib/services";
 
 export interface SettleResult {
-  status: "completed" | "failed" | "pending" | "unknown";
-  creditedNow: boolean;
+  status: "paid" | "unpaid" | "failed";
+  bookingRef: string | null;
   amount: number;
   currency: string;
-  channel: string | null;
-  card: { brand: string | null; last4: string | null } | null;
-  message: string | null;
-  bookingRef: string | null;
 }
 
-// In-memory settled transaction cache to quickly prevent duplicate webhook/redirect processing in the same process
-const settledSessions = new Map<string, SettleResult>();
+function bookingRefOf(session: Stripe.Checkout.Session) {
+  return session.client_reference_id || session.metadata?.bookingRef || null;
+}
 
-export async function settleFromCheckoutSession(
-  session: Stripe.Checkout.Session
-): Promise<SettleResult> {
-  const sessionId = session.id;
-
-  if (settledSessions.has(sessionId)) {
-    return { ...settledSessions.get(sessionId)!, creditedNow: false };
+function parseNotes(notes: string | null): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(notes || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return { rawNotes: notes };
   }
+}
 
-  const bookingRef = session.client_reference_id || session.metadata?.bookingRef || null;
-  const isPaid = session.payment_status === "paid" || session.status === "complete";
-  const amount = (session.amount_total ?? 0) / 100;
+/**
+ * Turns a Checkout Session into a booking, but only when Stripe reports it paid for exactly the
+ * deposit the server priced. Safe to call repeatedly (redirect and webhook both call it).
+ * Database errors are thrown so the webhook responds 500 and Stripe retries delivery.
+ */
+export async function settleCheckoutSession(session: Stripe.Checkout.Session): Promise<SettleResult> {
+  const bookingRef = bookingRefOf(session);
   const currency = session.currency || "usd";
+  const amountMinor = session.amount_total ?? 0;
+  const base = { bookingRef, amount: fromMinorUnits(amountMinor, currency), currency };
 
-  if (isPaid) {
-    const result: SettleResult = {
-      status: "completed",
-      creditedNow: true,
-      amount,
-      currency,
-      channel: session.payment_method_types?.[0] ?? "card",
-      card: null,
-      message: "Stripe payment deposit completed successfully.",
-      bookingRef,
-    };
+  // "complete" alone is not enough: delayed methods complete before the money arrives.
+  if (!bookingRef || session.payment_status !== "paid") return { ...base, status: "unpaid" };
 
-    settledSessions.set(sessionId, result);
-
-    // Persist confirmation directly to MongoDB via Prisma
-    if (bookingRef && process.env.DATABASE_URL) {
-      try {
-        const existing = await prisma.booking.findUnique({
-          where: { ref: bookingRef },
-        });
-
-        if (existing) {
-          let notesObj: Record<string, unknown> = {};
-          try {
-            notesObj = JSON.parse(existing.notes || "{}");
-          } catch {
-            notesObj = { rawNotes: existing.notes };
-          }
-          notesObj.stripeSessionId = sessionId;
-          notesObj.paymentStatus = "deposit_held";
-          notesObj.depositPaid = amount;
-          notesObj.settledAt = new Date().toISOString();
-
-          await prisma.booking.update({
-            where: { ref: bookingRef },
-            data: {
-              status: "deposit_held",
-              depositPaid: amount,
-              notes: JSON.stringify(notesObj),
-            },
-          });
-        } else {
-          // If the booking wasn't pre-created, create it from checkout session metadata
-          const meta = session.metadata || {};
-          const notesObj = {
-            stripeSessionId: sessionId,
-            paymentStatus: "deposit_held",
-            depositPaid: amount,
-            settledAt: new Date().toISOString(),
-          };
-
-          await prisma.booking.create({
-            data: {
-              ref: bookingRef,
-              clientName: meta.clientName || session.customer_details?.name || "Collector",
-              clientEmail: meta.clientEmail || session.customer_details?.email || session.customer_email || "",
-              tattooTitle: meta.tattooTitle || "Custom Design",
-              tattooImage: meta.tattooImage || "",
-              style: meta.style || "Custom",
-              placement: meta.placement || "To be discussed",
-              size: meta.size || "Standard",
-              date: meta.date || "Scheduled",
-              time: meta.time || "12:00 PM",
-              sessionType: meta.sessionType || "Studio Appointment",
-              depositPaid: amount,
-              estimatedTotal: Number(meta.estimatedTotal) || 280,
-              status: "deposit_held",
-              notes: JSON.stringify(notesObj),
-            },
-          });
-        }
-      } catch (dbErr) {
-        console.error("Failed to persist Stripe settlement in MongoDB:", dbErr);
-      }
-    }
-
-    return result;
+  const meta = session.metadata ?? {};
+  const expectedDeposit = Number(meta.depositAmount);
+  if (!Number.isFinite(expectedDeposit) || toMinorUnits(expectedDeposit, currency) !== amountMinor) {
+    console.error(
+      `Stripe session ${session.id} paid ${amountMinor} ${currency} but deposit ${meta.depositAmount} was expected; booking ${bookingRef} was not confirmed.`
+    );
+    return { ...base, status: "failed" };
   }
 
-  return {
-    status: "pending",
-    creditedNow: false,
-    amount,
-    currency,
-    channel: session.payment_method_types?.[0] ?? "card",
-    card: null,
-    message: "Payment is pending authorization.",
-    bookingRef,
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not configured, so a paid booking cannot be recorded.");
+  }
+
+  const payment = {
+    paymentStatus: "paid",
+    stripeSessionId: session.id,
+    stripePaymentIntentId:
+      typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null,
+    paidAt: new Date().toISOString(),
   };
+
+  const existing = await prisma.booking.findUnique({ where: { ref: bookingRef } });
+  if (existing && !isCheckoutStatus(existing.status)) return { ...base, status: "paid" };
+
+  if (existing) {
+    await prisma.booking.updateMany({
+      where: { ref: bookingRef, status: { in: [...CHECKOUT_STATUSES] } },
+      data: {
+        status: "deposit_held",
+        depositPaid: base.amount,
+        notes: JSON.stringify({ ...parseNotes(existing.notes), ...payment }),
+      },
+    });
+    return { ...base, status: "paid" };
+  }
+
+  // The checkout route saves the booking before redirecting; this only covers a record lost since.
+  try {
+    await prisma.booking.create({
+      data: {
+        ref: bookingRef,
+        clientName: meta.clientName || session.customer_details?.name || "Client",
+        clientEmail: meta.clientEmail || session.customer_details?.email || session.customer_email || "",
+        tattooTitle: meta.tattooTitle || "Tattoo appointment",
+        tattooImage: "",
+        style: meta.service || "tattoo",
+        placement: meta.placement || "To be discussed",
+        size: meta.sizeLabel || "To be discussed",
+        location: meta.location || null,
+        date: meta.date || "Flexible",
+        time: meta.time || "To be confirmed",
+        sessionType: "Studio Appointment",
+        depositPaid: base.amount,
+        estimatedTotal: Number(meta.estimatedTotal) || 0,
+        status: "deposit_held",
+        notes: JSON.stringify({
+          ...payment,
+          ...(meta.offerId && {
+            offer: { id: meta.offerId, percentOff: Number(meta.offerPercentOff), originalEstimate: Number(meta.originalEstimate) },
+          }),
+        }),
+      },
+    });
+  } catch (error) {
+    // A concurrent redirect/webhook already created it.
+    if ((error as { code?: string }).code !== "P2002") throw error;
+  }
+  return { ...base, status: "paid" };
+}
+
+/** Records that a checkout failed or expired. The booking was never created, so it stays hidden. */
+export async function markCheckoutUnpaid(
+  session: Stripe.Checkout.Session,
+  status: "payment_failed" | "payment_expired"
+) {
+  const bookingRef = bookingRefOf(session);
+  if (!bookingRef || !process.env.DATABASE_URL) return;
+  await prisma.booking.updateMany({ where: { ref: bookingRef, status: "awaiting_payment" }, data: { status } });
 }

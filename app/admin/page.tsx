@@ -10,24 +10,20 @@ import {
   Calendar,
   Clock,
   Search,
-  Filter,
   ArrowUpRight,
   DollarSign,
-  Users,
   CheckCircle2,
   CalendarCheck,
   Download,
   Mail,
-  MoreVertical,
-  ChevronRight,
   Sparkles,
-  MapPin,
-  FileText,
   AlertCircle,
   X,
   Printer,
   ShieldCheck,
 } from "lucide-react";
+import { formatUsd } from "@/lib/services";
+import { LOCATIONS, bookingLocation, locationName } from "@/lib/locations";
 
 export default function AdminPage() {
   const {
@@ -37,11 +33,15 @@ export default function AdminPage() {
     isAdmin,
     adminEmail,
     openAuthModal,
-    login,
+    loginWithGoogle,
+    authReady,
+    bookingsError,
+    refreshBookings,
   } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
 
   // Revenue & Appointment Metrics
@@ -81,20 +81,20 @@ export default function AdminPage() {
           b.clientUsername.toLowerCase().includes(searchQuery.toLowerCase()));
 
       if (!matchesSearch) return false;
+      if (selectedLocation !== "all" && bookingLocation(b.location).id !== selectedLocation) return false;
 
       if (selectedStatusFilter === "all") return true;
       if (selectedStatusFilter === "active")
         return b.status === "deposit_held" || b.status === "confirmed";
       if (selectedStatusFilter === "completed") return b.status === "completed";
-      if (selectedStatusFilter === "consultation")
-        return b.sessionType === "Design Consultation";
       return true;
     });
-  }, [allBookings, searchQuery, selectedStatusFilter]);
+  }, [allBookings, searchQuery, selectedStatusFilter, selectedLocation]);
 
   const handleExportCSV = () => {
     const headers = [
       "Reference",
+      "Studio",
       "Client Name",
       "Client Email",
       "Piece Title",
@@ -111,6 +111,7 @@ export default function AdminPage() {
 
     const rows = allBookings.map((b) => [
       b.ref,
+      `"${locationName(bookingLocation(b.location))}"`,
       `"${b.clientName}"`,
       b.clientEmail,
       `"${b.tattooTitle}"`,
@@ -138,41 +139,12 @@ export default function AdminPage() {
     document.body.removeChild(link);
   };
 
-  const getStatusBadge = (status: AdminBooking["status"]) => {
-    switch (status) {
-      case "deposit_held":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Deposit Held
-          </span>
-        );
-      case "confirmed":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            Confirmed
-          </span>
-        );
-      case "completed":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <CheckCircle2 className="w-3 h-3" />
-            Completed
-          </span>
-        );
-      case "cancelled":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-white/10">
-            Cancelled
-          </span>
-        );
-      default:
-        return null;
-    }
-  };
+  // Wait for Firebase to restore the session before deciding access.
+  if (!authReady) {
+    return <div className="min-h-screen bg-[#09090b]" aria-busy="true" />;
+  }
 
-  // Restrict access to authorized administrator
+  // Restrict access to authorized administrator (the API enforces this server-side too)
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-[#09090b] text-[#fafafa] flex flex-col selection:bg-white selection:text-black">
@@ -221,19 +193,21 @@ export default function AdminPage() {
             <div className="mt-8 flex flex-col gap-3">
               <button
                 type="button"
-                onClick={() => login(adminEmail, "Studio Admin")}
+                onClick={() => {
+                  loginWithGoogle().catch((err) => console.warn("Admin Google sign-in failed:", err));
+                }}
                 className="w-full py-3.5 px-5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-zinc-200 transition-all shadow-lg shadow-white/10 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4 text-black" />
-                <span>Instant Sign-In as Studio Owner ({adminEmail})</span>
+                <span>Sign in with Google ({adminEmail})</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => openAuthModal("login")}
+                onClick={openAuthModal}
                 className="w-full py-3 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white font-medium text-xs transition-colors text-center"
               >
-                <span>Switch or Use Another Email</span>
+                <span>Use a different Google account</span>
               </button>
 
               <Link
@@ -268,10 +242,6 @@ export default function AdminPage() {
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Admin: {user?.email}</span>
                 </span>
-                <span className="flex items-center gap-1 text-[11px] font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  Live Sync
-                </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-2">
                 Bookings & Revenue Manager
@@ -301,6 +271,22 @@ export default function AdminPage() {
             </div>
           </div>
 
+          {bookingsError && (
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-2xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-200 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span>{bookingsError}</span>
+              <button
+                type="button"
+                onClick={() => refreshBookings().catch(() => undefined)}
+                className="self-start rounded-xl border border-red-300/30 px-3 py-1.5 text-xs font-semibold hover:bg-red-400/10 sm:self-auto cursor-pointer"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
           {/* KPI Metrics Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Metric 1 */}
@@ -315,9 +301,8 @@ export default function AdminPage() {
                 <div className="text-3xl font-extrabold text-white tracking-tight">
                   ${metrics.totalDeposits.toLocaleString()}
                 </div>
-                <div className="text-[11px] text-zinc-400 mt-1 flex items-center gap-1.5">
-                  <span className="text-emerald-400 font-semibold">$50 hold</span>
-                  <span>per active reservation</span>
+                <div className="text-[11px] text-zinc-400 mt-1">
+                  Paid deposits on bookings that aren’t cancelled
                 </div>
               </div>
             </div>
@@ -393,6 +378,20 @@ export default function AdminPage() {
                 />
               </div>
 
+              {/* Studio Location Filter */}
+              <label htmlFor="location-filter" className="sr-only">Studio location</label>
+              <select
+                id="location-filter"
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="bg-zinc-900 border border-white/15 text-xs text-zinc-200 rounded-xl px-3 py-2 focus:outline-none focus:border-white/40 cursor-pointer"
+              >
+                <option value="all">All locations</option>
+                {LOCATIONS.map((studio) => (
+                  <option key={studio.id} value={studio.id}>{locationName(studio)}</option>
+                ))}
+              </select>
+
               {/* Status Filter Tabs */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
                 {[
@@ -406,13 +405,6 @@ export default function AdminPage() {
                     id: "completed",
                     label: "Completed",
                     count: metrics.completedSessions,
-                  },
-                  {
-                    id: "consultation",
-                    label: "Consultations",
-                    count: allBookings.filter(
-                      (b) => b.sessionType === "Design Consultation"
-                    ).length,
                   },
                 ].map((tab) => (
                   <button
@@ -446,7 +438,7 @@ export default function AdminPage() {
                   <tr className="border-b border-white/[0.06] bg-zinc-900/40 text-[11px] font-mono uppercase tracking-wider text-zinc-400">
                     <th className="py-3.5 px-4 sm:px-6">Reference & Client</th>
                     <th className="py-3.5 px-4">Tattoo Design</th>
-                    <th className="py-3.5 px-4">Date & Slot</th>
+                    <th className="py-3.5 px-4">Studio & Date</th>
                     <th className="py-3.5 px-4">Payment & Breakdown</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4 sm:px-6 text-right">Actions</th>
@@ -465,12 +457,12 @@ export default function AdminPage() {
                         </div>
                         <h4 className="text-base font-bold text-white">
                           {allBookings.length === 0
-                            ? "Dynamic Ledger Active — Waiting for Bookings"
+                            ? "No paid bookings yet"
                             : "No matching bookings found"}
                         </h4>
                         <p className="text-xs text-zinc-400 mt-1 max-w-md mx-auto leading-relaxed">
                           {allBookings.length === 0
-                            ? "All dummy data has been removed. As clients sign in with Google and submit bookings on /book or through any tattoo piece, their real live appointments and deposits will dynamically appear here."
+                            ? "Bookings appear here once a client’s Stripe deposit payment succeeds. Free consultation requests are listed under Consultation requests."
                             : "Try searching for a different client name, reference code, or reset the active filter tab."}
                         </p>
                         {allBookings.length === 0 && (
@@ -480,7 +472,7 @@ export default function AdminPage() {
                               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors shadow-sm"
                             >
                               <Sparkles className="w-3.5 h-3.5" />
-                              <span>Place a Real Booking on /book</span>
+                              <span>Open the booking page</span>
                             </Link>
                           </div>
                         )}
@@ -572,6 +564,9 @@ export default function AdminPage() {
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-300 font-mono">
                               {b.sessionType === "Studio Appointment" ? "In-Studio" : "Virtual"}
                             </span>
+                          </div>
+                          <div className="text-[11px] text-[#d3b995] mt-0.5">
+                            {locationName(bookingLocation(b.location))}
                           </div>
                         </td>
 
@@ -727,33 +722,34 @@ export default function AdminPage() {
                 <span className="text-[10px] uppercase font-mono text-zinc-400">Schedule</span>
                 <div className="font-semibold text-white">{selectedBooking.date}</div>
                 <div className="text-[11px] text-zinc-400">{selectedBooking.time}</div>
+                <div className="text-[11px] text-[#d3b995]">{locationName(bookingLocation(selectedBooking.location))}</div>
               </div>
 
               <div className="p-3 rounded-xl bg-zinc-900/60 border border-white/[0.06] space-y-1">
                 <span className="text-[10px] uppercase font-mono text-zinc-400">Format</span>
                 <div className="font-semibold text-white">{selectedBooking.sessionType}</div>
-                <div className="text-[11px] text-emerald-400 font-mono">Held with $50</div>
+                <div className="text-[11px] text-emerald-400 font-mono">Deposit {formatUsd(selectedBooking.depositPaid)}</div>
               </div>
             </div>
 
             {/* Financial Ledger */}
             <div className="p-4 rounded-2xl bg-zinc-900/80 border border-white/[0.08] space-y-2.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-zinc-400">Deposit Paid (Card / Google Auth):</span>
+                <span className="text-zinc-400">Deposit paid (Stripe):</span>
                 <span className="font-mono font-bold text-emerald-400">
-                  ${selectedBooking.depositPaid}.00 (PAID)
+                  {formatUsd(selectedBooking.depositPaid)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">Estimated Total Session Cost:</span>
                 <span className="font-mono font-semibold text-white">
-                  ${selectedBooking.estimatedTotal}.00
+                  {formatUsd(selectedBooking.estimatedTotal)}
                 </span>
               </div>
               <div className="flex items-center justify-between border-t border-white/[0.06] pt-2 font-bold">
                 <span className="text-zinc-300">Remaining Balance on Session:</span>
                 <span className="font-mono text-amber-400">
-                  ${selectedBooking.estimatedTotal - selectedBooking.depositPaid}.00
+                  {formatUsd(Math.max(0, selectedBooking.estimatedTotal - selectedBooking.depositPaid))}
                 </span>
               </div>
             </div>
