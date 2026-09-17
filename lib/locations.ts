@@ -2,10 +2,13 @@
 // local time zone. Confirm these cities and add street addresses, phone numbers, and hours
 // before launch.
 export const LOCATIONS = [
-  { id: "los-angeles", city: "Los Angeles", state: "California", stateCode: "CA", timeZone: "America/Los_Angeles", timeZoneLabel: "Pacific Time" },
   { id: "austin", city: "Austin", state: "Texas", stateCode: "TX", timeZone: "America/Chicago", timeZoneLabel: "Central Time" },
-  { id: "miami", city: "Miami", state: "Florida", stateCode: "FL", timeZone: "America/New_York", timeZoneLabel: "Eastern Time" },
-  { id: "new-york", city: "New York", state: "New York", stateCode: "NY", timeZone: "America/New_York", timeZoneLabel: "Eastern Time" },
+  { id: "boston", city: "Boston", state: "Massachusetts", stateCode: "MA", timeZone: "America/New_York", timeZoneLabel: "Eastern Time" },
+  { id: "fargo", city: "Fargo", state: "North Dakota", stateCode: "ND", timeZone: "America/Chicago", timeZoneLabel: "Central Time" },
+  { id: "las-vegas", city: "Las Vegas", state: "Nevada", stateCode: "NV", timeZone: "America/Los_Angeles", timeZoneLabel: "Pacific Time" },
+  { id: "portland", city: "Portland", state: "Oregon", stateCode: "OR", timeZone: "America/Los_Angeles", timeZoneLabel: "Pacific Time" },
+  { id: "providence", city: "Providence", state: "Rhode Island", stateCode: "RI", timeZone: "America/New_York", timeZoneLabel: "Eastern Time" },
+  { id: "seattle", city: "Seattle", state: "Washington", stateCode: "WA", timeZone: "America/Los_Angeles", timeZoneLabel: "Pacific Time" },
 ] as const;
 
 export type StudioLocation = (typeof LOCATIONS)[number];
@@ -20,7 +23,7 @@ export function locationName(location: { city: string; stateCode: string }) {
   return `${location.city}, ${location.stateCode}`;
 }
 
-/** The studio for a stored booking. Bookings made before multiple locations were all in Los Angeles. */
+/** The studio for a stored booking. Defaults to the primary studio if unset. */
 export function bookingLocation(id: string | null | undefined): StudioLocation {
   return getLocation(id) ?? LOCATIONS[0];
 }
