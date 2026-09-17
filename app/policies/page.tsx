@@ -84,7 +84,8 @@ export default function PoliciesPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-zinc-500">Tattoo removal starts with a free consultation, so no deposit is taken online.</p>
+          <p className="mt-3 text-xs text-[#d3b995]">Couples packages cover two matching or complementary tattoos in a shared session, discounted lower per person than individual sessions with a single shared deposit.</p>
+          <p className="mt-1.5 text-xs text-zinc-500">Tattoo removal starts with a free consultation, so no deposit is taken online.</p>
         </section>
 
         <div className="mt-10 space-y-10 leading-relaxed text-zinc-300">

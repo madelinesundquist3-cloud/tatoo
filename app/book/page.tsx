@@ -17,7 +17,7 @@ export default async function BookPage({
 
   const location = getLocation(params.location)?.id ?? "";
   const service = getService(params.service)?.id ?? "tattoo";
-  const size = getSizeTier(params.size)?.id ?? "medium";
+  const size = getSizeTier(params.size)?.id ?? (service === "couples" ? "couple-mini" : "medium");
   // Choices carried back from a cancelled checkout; the form re-validates everything.
   const placement = isPlacement(params.placement) ? (params.placement as string) : "";
   const time = TIME_PREFERENCES.find((slot) => slot === params.time) ?? TIME_PREFERENCES[3];

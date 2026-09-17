@@ -116,6 +116,11 @@ async function main() {
   assert.equal(small.session.line_items[0].price_data.unit_amount, 5000);
   assert.equal(small.session.metadata.estimatedTotal, '120');
 
+  const couple = await startCheckout({ size: 'couple-mini', service: 'couples' });
+  assert.equal(couple.session.line_items[0].price_data.unit_amount, 7000, 'couples mini deposit is 70');
+  assert.equal(couple.session.metadata.depositAmount, '70');
+  assert.equal(couple.session.metadata.estimatedTotal, '176', '20% off 220 is 176');
+
   studioToday = '2026-12-01';
   const afterOffer = await startCheckout();
   assert.equal(afterOffer.session.metadata.estimatedTotal, '350', 'no offer after Nov 30');

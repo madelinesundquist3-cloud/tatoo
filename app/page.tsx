@@ -19,7 +19,36 @@ export default function HomePage() {
   return <><Navbar /><main id="main-content"><Hero />
     <section id="services" className="studio-section">
       <p className="studio-eyebrow">One place to start</p><div className="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><h2 className="studio-heading">What’s your next chapter?</h2><p className="max-w-sm text-sm leading-relaxed text-zinc-400">Choose what feels right. We’ll start with your questions, preferences, and goals.</p></div>
-      <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{SERVICES.map((service) => <article key={service.id} className={`flex flex-col rounded-2xl border p-6 ${service.id === "removal" ? "border-[#d3b995]/40 bg-[#d3b995]/[0.08]" : "border-white/10 bg-white/[0.025]"}`}><span className="text-xs text-[#d3b995]">{service.number} /</span><h3 className="mb-3 mt-8 text-xl font-medium">{service.name}</h3><p className="flex-1 text-sm leading-relaxed text-zinc-400">{service.description}</p><Link className="mt-7 flex min-h-11 items-center justify-between gap-2 border-t border-white/10 pt-4 text-sm" href={service.id === "removal" ? "/services/tattoo-removal" : `/book?service=${service.id}`}>{service.id === "removal" ? "Explore removal" : "Book now"}<ArrowUpRight size={17} /></Link></article>)}</div>
+      <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{SERVICES.map((service) => (
+        <article
+          key={service.id}
+          className={`flex flex-col rounded-2xl border p-6 ${
+            service.id === "couples"
+              ? "border-[#d3b995]/40 bg-[#d3b995]/[0.05]"
+              : service.id === "removal"
+              ? "border-[#d3b995]/40 bg-[#d3b995]/[0.08]"
+              : "border-white/10 bg-white/[0.025]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#d3b995]">{service.number} /</span>
+            {service.id === "couples" && (
+              <span className="rounded-full bg-[#d3b995]/20 border border-[#d3b995]/40 px-2.5 py-0.5 text-[10px] font-semibold text-[#d3b995]">
+                Save 25–35% / person
+              </span>
+            )}
+          </div>
+          <h3 className="mb-3 mt-7 text-xl font-medium">{service.name}</h3>
+          <p className="flex-1 text-sm leading-relaxed text-zinc-400">{service.description}</p>
+          <Link
+            className="mt-7 flex min-h-11 items-center justify-between gap-2 border-t border-white/10 pt-4 text-sm hover:text-[#d3b995] transition-colors"
+            href={service.id === "removal" ? "/services/tattoo-removal" : `/book?service=${service.id}`}
+          >
+            {service.id === "removal" ? "Explore removal" : service.id === "couples" ? "Book couples package" : "Book now"}
+            <ArrowUpRight size={17} />
+          </Link>
+        </article>
+      ))}</div>
     </section>
     <section id="work" className="studio-section border-t border-white/10">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">

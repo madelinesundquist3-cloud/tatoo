@@ -31,6 +31,10 @@ const faqs = [
     answer: "Price depends on size, detail, color, placement, and session length. The booking page shows starting estimates; your artist gives you a final quote after reviewing your idea.",
   },
   {
+    question: "Do you offer couples or matching tattoo packages?",
+    answer: "Yes! We offer dedicated Couples & Duo packages for matching or complementary tattoos in a shared session. These packages are priced significantly lower per person than booking two separate individual sessions ($110/person for mini/flash vs $150 individual, $240/person for medium vs $350 individual), and require only one shared deposit.",
+  },
+  {
     question: "Where are your studios?",
     answer: `We have studios in ${LOCATIONS.map(locationName).join(", ")}. You book in your studio’s local time, and every location offers tattoos, cover-ups, touch-ups, and removal consultations.`,
   },

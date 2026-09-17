@@ -359,14 +359,27 @@ export function ConsultationForm({
                         name="service"
                         value={item.id}
                         checked={item.id === serviceId}
-                        onChange={() => { setServiceId(item.id); resetRequest(); }}
+                        onChange={() => {
+                          setServiceId(item.id);
+                          if (item.id === "couples") {
+                            setSizeId("couple-mini");
+                          } else if (sizeId.startsWith("couple-")) {
+                            setSizeId("medium");
+                          }
+                          resetRequest();
+                        }}
                         className="accent-[#d3b995]"
                       />
                       <span className="text-base font-medium">{item.name}</span>
+                      {item.id === "couples" && (
+                        <span className="rounded-full bg-[#d3b995]/20 border border-[#d3b995]/40 px-2 py-0.5 text-[10px] font-semibold text-[#d3b995]">
+                          Save 25–35% / person
+                        </span>
+                      )}
                     </span>
                     <span className="mt-3 block text-sm leading-relaxed text-zinc-400">{item.detail}</span>
                     <span className="mt-3 inline-block rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-300">
-                      {acceptsDeposit(item.id) ? `Book with a deposit from ${formatUsd(SIZE_TIERS[0].deposit)}` : "Free consultation first"}
+                      {acceptsDeposit(item.id) ? `Book with a deposit from ${formatUsd(item.id === "couples" ? 70 : SIZE_TIERS[0].deposit)}` : "Free consultation first"}
                     </span>
                     {acceptsDeposit(item.id) && offerOpen && (
                       <span className="ml-2 mt-3 inline-block rounded-md bg-[#d3b995] px-2.5 py-1 text-xs font-semibold text-[#171612]">
@@ -383,13 +396,39 @@ export function ConsultationForm({
         {step === 2 && (
           <div className="space-y-7">
             <fieldset>
-              <legend className="text-sm font-medium">Approximate size</legend>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                <legend className="text-sm font-medium">
+                  {serviceId === "couples" ? "Choose your couples package (covers both people)" : "Approximate size"}
+                </legend>
+                {serviceId === "couples" ? (
+                  <span className="text-xs font-semibold text-[#d3b995]">
+                    Lower rates per person than individual sessions
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setServiceId("couples");
+                      setSizeId("couple-mini");
+                      resetRequest();
+                    }}
+                    className="text-xs text-[#d3b995] hover:underline"
+                  >
+                    Booking for two? View Couples Packages →
+                  </button>
+                )}
+              </div>
               <p className="mt-1 text-xs text-zinc-400">
-                Estimates are starting prices in USD. Your artist confirms the final quote after reviewing your idea.
+                {serviceId === "couples"
+                  ? "Packages include two matching or complementary tattoos in a shared appointment. Each person pays significantly less than individual rates, with one shared deposit."
+                  : "Estimates are starting prices in USD. Your artist confirms the final quote after reviewing your idea."}
                 {offerOn && ` Prices include ${OFFER.percentOff}% off for deposit bookings made by ${OFFER.endsLabel}.`}
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {SIZE_TIERS.map((tier) => (
+                {(serviceId === "couples"
+                  ? SIZE_TIERS.filter((t) => t.category === "couple")
+                  : SIZE_TIERS.filter((t) => t.category === "individual")
+                ).map((tier) => (
                   <label
                     key={tier.id}
                     className={`cursor-pointer rounded-2xl border p-4 transition-colors ${
@@ -409,7 +448,7 @@ export function ConsultationForm({
                     </span>
                     <span className="mt-2 block text-xs text-zinc-400">{tier.detail}</span>
                     <span className="mt-3 block font-mono text-xs text-zinc-300">
-                      From{" "}
+                      Total:{" "}
                       {offerOn ? (
                         <>
                           <s className="text-zinc-500">{formatUsd(tier.estimate)}</s>{" "}
@@ -561,13 +600,17 @@ export function ConsultationForm({
               />
             </label>
             <label className="block text-sm">
-              Describe your idea <span className="text-zinc-400">(optional)</span>
+              {serviceId === "couples" ? "Describe both designs & partner’s name" : "Describe your idea"} <span className="text-zinc-400">(optional)</span>
               <textarea
                 rows={4}
                 maxLength={1000}
                 value={notes}
                 onChange={(event) => { setNotes(event.target.value); resetRequest(); }}
-                placeholder="Style, subject, colors, reference links, or anything your artist should know."
+                placeholder={
+                  serviceId === "couples"
+                    ? "Partner’s name, both matching or individual design ideas, placements, or reference links."
+                    : "Style, subject, colors, reference links, or anything your artist should know."
+                }
                 className="studio-input"
               />
               <span className="mt-2 block text-xs text-zinc-400">Please keep medical details for your in-person consultation.</span>
