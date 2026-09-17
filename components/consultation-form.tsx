@@ -117,7 +117,6 @@ export function ConsultationForm({
   const [googleLoading, setGoogleLoading] = useState(false);
   const [locationId, setLocationId] = useState<LocationId | "">(initialLocation);
   const [serviceId, setServiceId] = useState<ServiceId>(initialService);
-  const [preferredMode, setPreferredMode] = useState<BookingMode>("deposit");
   const [step, setStep] = useState(resumeCheckout && initialLocation && initialPlacement ? 3 : 1);
   const [sizeId, setSizeId] = useState<SizeTierId>(initialSize);
   const [placement, setPlacement] = useState(initialPlacement);
@@ -139,7 +138,7 @@ export function ConsultationForm({
   const location = getLocation(locationId);
   const service = getService(serviceId)!;
   const size = getSizeTier(sizeId)!;
-  const bookingMode: BookingMode = acceptsDeposit(serviceId) ? preferredMode : "consultation";
+  const bookingMode = "deposit" as const;
   const contactName = name ?? user?.name ?? "";
   const email = user?.email ?? "";
   const today = todayByLocation[location?.id ?? LOCATIONS[0].id] ?? new Date().toISOString().slice(0, 10);
@@ -379,9 +378,9 @@ export function ConsultationForm({
                     </span>
                     <span className="mt-3 block text-sm leading-relaxed text-zinc-400">{item.detail}</span>
                     <span className="mt-3 inline-block rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-300">
-                      {acceptsDeposit(item.id) ? `Book with a deposit from ${formatUsd(item.id === "couples" ? 70 : SIZE_TIERS[0].deposit)}` : "Free consultation first"}
+                      Book with a deposit from {formatUsd(item.id === "couples" ? 70 : SIZE_TIERS[0].deposit)}
                     </span>
-                    {acceptsDeposit(item.id) && offerOpen && (
+                    {offerOpen && (
                       <span className="ml-2 mt-3 inline-block rounded-md bg-[#d3b995] px-2.5 py-1 text-xs font-semibold text-[#171612]">
                         {OFFER.percentOff}% off until {OFFER.endsLabel}
                       </span>
@@ -536,41 +535,16 @@ export function ConsultationForm({
 
         {step === 3 && user && (
           <div className="space-y-6">
-            {acceptsDeposit(serviceId) ? (
-              <fieldset className="rounded-2xl border border-white/10 bg-black/30 p-4">
-                <legend className="px-1 text-xs uppercase tracking-wider font-semibold text-zinc-400">How would you like to book?</legend>
-                <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  {([
-                    ["deposit", "Book with a deposit", `Pay ${formatUsd(size.deposit)} today to hold your spot. It’s credited toward your final price.${offerOn ? ` Locks in ${OFFER.percentOff}% off.` : ""}`],
-                    ["consultation", "Free consultation", "No payment. Talk through your idea first; this doesn’t reserve a spot."],
-                  ] as const).map(([mode, title, description]) => (
-                    <label
-                      key={mode}
-                      className={`cursor-pointer rounded-xl border p-3.5 transition-colors ${
-                        bookingMode === mode ? "border-[#d3b995] bg-[#d3b995]/10" : "border-white/10 bg-white/[0.02]"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="bookingMode"
-                          value={mode}
-                          checked={bookingMode === mode}
-                          onChange={() => { setPreferredMode(mode); resetRequest(); }}
-                          className="accent-[#d3b995]"
-                        />
-                        <span className="text-sm font-semibold text-white">{title}</span>
-                      </span>
-                      <span className="mt-1.5 block text-xs text-zinc-400">{description}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            ) : (
-              <p className="rounded-2xl border border-[#d3b995]/30 bg-[#d3b995]/5 p-4 text-sm leading-relaxed text-zinc-300">
-                Tattoo removal starts with a free consultation so a qualified provider can assess your tattoo first. No payment is taken today.
+            <div className="rounded-2xl border border-[#d3b995]/30 bg-[#d3b995]/[0.06] p-4 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-white">Deposit hold required</span>
+                <span className="font-mono font-semibold text-[#d3b995]">{formatUsd(size.deposit)}</span>
+              </div>
+              <p className="mt-1.5 text-xs leading-relaxed text-zinc-300">
+                A {formatUsd(size.deposit)} deposit holds your appointment and is credited in full toward your final tattoo or service price.
+                {offerOn && ` Locks in ${OFFER.percentOff}% off until ${OFFER.endsLabel}.`}
               </p>
-            )}
+            </div>
 
             <label className="block text-sm">
               Full name
@@ -665,10 +639,10 @@ export function ConsultationForm({
           {(step < 3 || user) && (
             <button type="submit" disabled={busy} className="studio-button disabled:opacity-50">
               {busy ? (
-                <><LoaderIcon className="w-4 h-4 animate-spin" /> {bookingMode === "deposit" ? "Opening secure checkout…" : "Saving request…"}</>
+                <><LoaderIcon className="w-4 h-4 animate-spin" /> Opening secure checkout…</>
               ) : (
                 <>
-                  {step < 3 ? "Continue" : bookingMode === "deposit" ? `Pay ${formatUsd(size.deposit)} deposit` : "Request free consultation"}
+                  {step < 3 ? "Continue" : `Pay ${formatUsd(size.deposit)} deposit`}
                   <ArrowRightIcon className="w-4 h-4" />
                 </>
               )}

@@ -56,7 +56,7 @@ const faqs = [
   },
   {
     question: "Do you offer tattoo removal?",
-    answer: "Tattoo removal starts with a free consultation so a qualified provider can assess your tattoo and explain realistic results, number of sessions, and cost.",
+    answer: "Yes. Our tattoo removal and fading appointments begin with a consultation with a qualified provider to assess your tattoo, explain realistic expectations, number of sessions, and pricing. Your online deposit holds your spot and is credited in full toward your treatment.",
   },
   {
     question: "How do I take care of my new tattoo?",
@@ -88,7 +88,7 @@ export default function FaqPage() {
         <h1 className="studio-heading mt-4">Frequently asked questions</h1>
         <p className="mt-4 leading-relaxed text-zinc-400">
           Can’t find your answer? Read our <Link href="/policies" className="text-[#d3b995] underline underline-offset-4">deposit policy</Link> and{" "}
-          <Link href="/aftercare" className="text-[#d3b995] underline underline-offset-4">aftercare guide</Link>, or request a free consultation.
+          <Link href="/aftercare" className="text-[#d3b995] underline underline-offset-4">aftercare guide</Link>, or book your appointment online.
         </p>
 
         <div className="mt-10">

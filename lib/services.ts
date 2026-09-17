@@ -1,7 +1,7 @@
 export const SERVICES = [
   { id: "tattoo", name: "Custom & flash tattoos", shortName: "Tattoos", description: "Start with your own idea or find inspiration in the gallery. Talk through style, size, and placement.", detail: "Bring an idea, a reference, or simply a question.", number: "01" },
   { id: "couples", name: "Couples & duo packages", shortName: "Couples / Duo", description: "Matching or complementary tattoos for two in a shared session. Special package pricing significantly lower per person than individual bookings.", detail: "Two tattoos, one shared session, discounted couples pricing.", number: "02" },
-  { id: "removal", name: "Tattoo removal", shortName: "Tattoo removal", description: "Ready for a change? Start with a consultation about laser removal or fading an existing tattoo.", detail: "A provider assessment comes before any treatment.", number: "03" },
+  { id: "removal", name: "Tattoo removal", shortName: "Tattoo removal", description: "Laser removal and fading assessment with a qualified provider. Deposit is credited in full toward your treatment.", detail: "Provider assessment and treatment planning, credited toward your session.", number: "03" },
   { id: "cover-up", name: "Cover-ups", shortName: "Cover-ups", description: "Explore a new design for an existing tattoo, with an assessment of what can realistically be covered.", detail: "Plan around your existing ink, size, and color.", number: "04" },
   { id: "touch-up", name: "Touch-ups", shortName: "Touch-ups", description: "Discuss faded lines, color, or small details that you would like refreshed.", detail: "Review the tattoo and its healing before booking.", number: "05" },
 ] as const;
@@ -11,8 +11,8 @@ export function getService(id: unknown) {
   return SERVICES.find((service) => service.id === id);
 }
 
-/** Services bookable with an online deposit. Removal starts with a free provider consultation. */
-const DEPOSIT_SERVICE_IDS: readonly ServiceId[] = ["tattoo", "couples", "cover-up", "touch-up"];
+/** All studio services are bookable with an online deposit that credits toward the final price. */
+const DEPOSIT_SERVICE_IDS: readonly ServiceId[] = ["tattoo", "couples", "removal", "cover-up", "touch-up"];
 export function acceptsDeposit(id: ServiceId) {
   return DEPOSIT_SERVICE_IDS.includes(id);
 }

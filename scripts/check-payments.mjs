@@ -33,7 +33,7 @@ async function main() {
   assert.equal(offers.offerPrice(350), 280);
   assert.equal(offers.offerPrice(150), 120);
   assert.equal(offers.offerAppliesTo('cover-up', '2026-10-01'), true);
-  assert.equal(offers.offerAppliesTo('removal', '2026-10-01'), false, 'removal is a free consultation, not an offer booking');
+  assert.equal(offers.offerAppliesTo('removal', '2026-10-01'), true, 'removal is now a deposit booking that receives the offer');
   const LA = 'America/Los_Angeles';
   assert.equal(locations.dateInTimeZone(LA, new Date(offers.OFFER_ENDS_AT - 1)), '2026-11-30', 'banner runs to the end of Nov 30 in LA');
   assert.equal(locations.dateInTimeZone(LA, new Date(offers.OFFER_ENDS_AT)), '2026-12-01');
@@ -129,10 +129,13 @@ async function main() {
   studioToday = '2026-11-30';
 
   const sessionCount = sessions.length;
-  assert.equal((await startCheckout({ service: 'removal' })).response.status, 400);
+  assert.equal((await startCheckout({ service: 'unknown' })).response.status, 400);
   assert.equal((await startCheckout({ policyAccepted: false })).response.status, 400);
   assert.equal((await startCheckout({ size: 'huge' })).response.status, 400);
   assert.equal(sessions.length, sessionCount, 'invalid requests never reach Stripe');
+
+  const removalBooking = await startCheckout({ service: 'removal' });
+  assert.equal(removalBooking.response.status, 201, 'removal can now be booked with a deposit');
 
   stripeDown = true;
   const outage = await startCheckout();

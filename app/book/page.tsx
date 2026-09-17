@@ -36,8 +36,8 @@ export default async function BookPage({
             <p className="studio-eyebrow">Studios across the USA</p>
             <h1 className="studio-heading mt-3">Book your tattoo.</h1>
             <p className="mt-4 max-w-2xl leading-relaxed text-zinc-400">
-              Choose your nearest studio, service, and size, then hold your spot with a deposit from {formatUsd(SIZE_TIERS[0].deposit)},
-              credited toward your final price. Not ready yet? Request a free consultation instead.
+              Choose your nearest studio, service, and size, then hold your spot with a secure deposit from {formatUsd(SIZE_TIERS[0].deposit)},
+              credited in full toward your final price.
             </p>
 
             {isCancelled && (
