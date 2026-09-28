@@ -90,6 +90,7 @@ const jsonLd = {
   description:
     "Custom tattoo designs, fine line, realism, cover-ups, and tattoo removal consultations at Marked Studio locations across the USA.",
   priceRange: "$$",
+  telephone: "+1-302-924-1734",
   hasMap: "https://www.marktattoo.com/locations",
   sameAs: [
     "https://www.marktattoo.com",
@@ -98,6 +99,7 @@ const jsonLd = {
 
 import { AuthProvider } from "@/lib/auth-context";
 import { AuthModal } from "@/components/auth-modal";
+import { FloatingWhatsApp } from "@/components/floating-whatsapp";
 
 export default function RootLayout({
   children,
@@ -119,6 +121,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <AuthModal />
+          <FloatingWhatsApp />
         </AuthProvider>
       </body>
     </html>

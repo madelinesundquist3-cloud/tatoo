@@ -36,6 +36,15 @@ export function Footer() {
           <p className="mt-3 text-sm text-zinc-400">New ink. A fresh start. Your next chapter.</p>
           <p className="mt-2 text-xs text-zinc-500">Studios in {LOCATIONS.map((studio) => studio.city).join(" · ")}</p>
           <p className="mt-1 text-xs text-zinc-500">18+ only · valid photo ID required</p>
+          <a
+            href="https://wa.me/13029241734"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-950/20 px-3.5 py-1.5 text-xs text-emerald-300 transition-colors hover:border-emerald-500/60 hover:bg-emerald-950/40"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            WhatsApp: +1 (302) 924-1734
+          </a>
         </div>
         {columns.map((column) => (
           <nav key={column.title} aria-label={column.title}>

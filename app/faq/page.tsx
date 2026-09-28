@@ -100,9 +100,17 @@ export default function FaqPage() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-wrap gap-3">
+        <div className="mt-12 flex flex-wrap items-center gap-3">
           <Link href="/book" className="studio-button">Book now</Link>
           <Link href="/aftercare" className="studio-button-secondary">Aftercare guide</Link>
+          <a
+            href="https://wa.me/13029241734?text=Hi%20Marked%20Studio!%20I%20have%20a%20question%20about%20your%20services."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-950/20 px-6 py-3.5 text-sm font-medium text-emerald-300 transition-colors hover:bg-emerald-950/40"
+          >
+            Chat on WhatsApp
+          </a>
         </div>
       </main>
       <Footer />
